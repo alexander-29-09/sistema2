@@ -1,11 +1,9 @@
-from flask import Flask, render_template, request, send_from_directory
+from flask import Flask, render_template, request, send_file
 from pytube import YouTube
 import os
-from flask_bootstrap import Bootstrap
-from threading import Thread
+import tempfile
 
 app = Flask(__name__)
-Bootstrap(app)
 
 @app.route('/')
 def index():
@@ -22,41 +20,33 @@ def descargar_video(url, formato):
         video = YouTube(url)
         if formato == 'video':
             stream = video.streams.get_highest_resolution()
-            extension = "mp4"    
+            extension = "mp4"
         else:
             stream = video.streams.filter(only_audio=True).first()
             extension = "mp3"
 
-        carpeta_descargas = os.path.expanduser('~\Downloads')
         nombre_archivo = limpiar_nombre(video.title)
         nombre_archivo += f".{extension}"
+
+        temp_dir = tempfile.gettempdir()
+        file_path = os.path.join(temp_dir, nombre_archivo)
+        stream.download(output_path=temp_dir, filename=nombre_archivo)
         
-        stream.download(output_path=carpeta_descargas, filename=nombre_archivo)
-        return f"Descarga completada en la carpeta de Descargas. Nombre del archivo: {nombre_archivo}"
+        return file_path
 
     except Exception as e:
-        return f"Ocurrió un error al descargar el archivo. Error: {str(e)}"
+        return None, f"Ocurrió un error al descargar el archivo. Error: {str(e)}"
 
 @app.route('/descargar', methods=['POST'])
 def descargar_handler():
     url = request.form['url']
     formato = request.form['formato']
 
-    def descargar_video_thread():
-        estado = descargar_video(url, formato)
-        with app.app_context():
-            app.estado_descarga = estado
-
-    descarga_thread = Thread(target=descargar_video_thread)
-    descarga_thread.start()
-
-    return render_template('index.html', estado_descarga=app.estado_descarga)
-#descarga video
-@app.route('/descargas')
-def ver_descargas():
-    carpeta_descargas = os.path.expanduser('~\Downloads')
-    return send_from_directory(carpeta_descargas, as_attachment=True)
+    file_path = descargar_video(url, formato)
+    if file_path:
+        return send_file(file_path, as_attachment=True)
+    else:
+        return render_template('index.html', estado_descarga="Ocurrió un error al descargar el archivo.")
 
 if __name__ == '__main__':
-    app.estado_descarga = None
     app.run(debug=True)
