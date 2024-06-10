@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, send_from_directory
 from pytube import YouTube
 import os
 import tempfile
@@ -47,6 +47,10 @@ def descargar_handler():
         return send_file(file_path, as_attachment=True)
     else:
         return render_template('index.html', estado_descarga="Ocurrió un error al descargar el archivo.")
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    return send_from_directory('templates', filename, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
